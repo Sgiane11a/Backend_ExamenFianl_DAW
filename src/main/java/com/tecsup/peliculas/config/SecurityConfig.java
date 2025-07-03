@@ -32,29 +32,25 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1. ACTIVAR LA CONFIGURACIÓN DE CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // 2. Deshabilitar CSRF (común para APIs REST stateless)
                 .csrf(csrf -> csrf.disable())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        // 1️⃣  ENDPOINTS 100 % PÚBLICOS
+                        .requestMatchers(HttpMethod.GET, "/api/peliculas/**", "/api/generos/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
 
-                // 3. Configurar la gestión de sesión como STATELESS (sin estado)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        // 2️⃣  RUTAS QUE REQUIEREN ROL
+                        .requestMatchers(HttpMethod.POST, "/api/peliculas/**", "/api/generos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,  "/api/peliculas/**", "/api/generos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE,"/api/peliculas/**", "/api/generos/**").hasRole("ADMIN")
 
-                // 4. Definir las reglas de autorización para las rutas
-                .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/api/auth/**").permitAll() // Permitir a todos acceder al login
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll() // Permitir acceso a la documentación
-                        .requestMatchers(HttpMethod.GET, "/api/peliculas/**", "/api/generos/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/peliculas", "/api/generos").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/peliculas/**", "/api/generos/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/peliculas/**", "/api/generos/**").hasRole("ADMIN")
-                        .anyRequest().authenticated() // Cualquier otra petición requiere autenticación
+                        // 3️⃣  CUALQUIER OTRA → AUTENTICADA
+                        .anyRequest().authenticated()
                 );
 
-        // 5. Añadir el filtro de JWT antes del filtro de autenticación estándar
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
@@ -76,19 +72,16 @@ public class SecurityConfig {
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        // Orígenes permitidos (la URL de tu frontend)
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000"));
-        // Métodos HTTP permitidos
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        // Cabeceras permitidas
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
-        // Permitir credenciales (cookies, etc.)
-        configuration.setAllowCredentials(true);
+        CorsConfiguration config = new CorsConfiguration();
+        // ⚠️ En producción pon tu dominio React; mientras pruebas, "*" es lo más simple
+        config.addAllowedOriginPattern("*");          // permite todos los orígenes
+        config.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+        config.setAllowedHeaders(Arrays.asList("*"));
+        config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // Aplicar esta configuración a todas las rutas de la API
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
+
 }

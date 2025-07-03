@@ -3,6 +3,7 @@ package com.tecsup.peliculas.security.jwt;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -17,13 +18,14 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     @Value("${jwt.secret}")
-    private String jwtSecret;
+    private String jwtSecret;           // ESTA clave debe tener al menos 64 caracteres base64
 
     @Value("${jwt.expiration.ms}")
     private long jwtExpirationInMs;
 
     private Key key() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret); // decodifica base64
+        return Keys.hmacShaKeyFor(keyBytes);                 // valida longitud automáticamente
     }
 
     public String generateToken(Authentication authentication) {
